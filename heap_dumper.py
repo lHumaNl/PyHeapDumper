@@ -27,10 +27,11 @@ class HeapDumper:
             file_name (str): The name of the file where the heap dump will be saved.
 
         Returns:
-            str: A message indicating the success or failure of saving the heap dump.
+            str: A message indicating the success of saving the heap dump.
         """
         try:
             start_time = time.time()
+
             gc.collect()
             objects = gc.get_objects()
             objects.extend(cls.__get_code_objects())
@@ -40,9 +41,13 @@ class HeapDumper:
                 metadata_dict.setdefault(str(type(obj)), {})[id(obj)] = cls.__get_object_metadata(obj)
 
             file_name = cls.__save_heap_dump(file_name, metadata_dict)
+            file_size = os.path.getsize(file_name)
+            file_size_mb = file_size / (1024 * 1024)
+
             end_time = time.time()
 
-            return f'Heap dump "{file_name}" saved in {end_time - start_time:.2f} seconds.'
+            return (f'Heap dump "{file_name}" saved in {end_time - start_time:.2f} seconds. '
+                    f'JSON size: {file_size_mb:.2f}MB')
         except Exception as e:
             tb = os.linesep.join(traceback.format_exc().split(os.linesep))
 
