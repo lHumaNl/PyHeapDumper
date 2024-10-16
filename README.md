@@ -4,9 +4,10 @@ This project provides a utility to create heap dumps of Python objects and save 
 is the `HeapDumper` class, which collects metadata of objects in memory and stores them in a file. A sample usage
 script (`example.py`) demonstrates how to periodically take heap dumps while performing background operations.
 
-# Profiling
+# Profiling heap dumps
 
 For profiling captured heap dumps use this util: https://github.com/lHumaNl/PyHeapProfiler
+
 ## Table of Contents
 
 - [Requirements](#requirements)
@@ -75,13 +76,4 @@ python example.py
 ### This will:
 
 Perform some simple calculations in the background.
-Take a heap dump every 10 seconds and save it to heap_dump.json.
-Continue this process for a total of 60 seconds.
-
-### How it works:
-
-#### do_some_work function: This function simulates background work by calculating square roots in a loop.
-
-#### periodic_heap_dump function: This function uses the HeapDumper.collect_heap_metadata method to create heap dumps at a specified interval. In the example, it saves a heap dump every 10 seconds for a total of 60 seconds.
-
-#### Logging: The example uses Python's logging library to provide detailed logs about the heap dump process.
+Take a heap dump every 10 seconds and save it to ./heap_dumps/examples/heap_dump_<count>.json.
