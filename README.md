@@ -76,4 +76,4 @@ python example.py
 ### This will:
 
 Perform some simple calculations in the background.
-Take a heap dump every 10 seconds and save it to ./heap_dumps/examples/heap_dump_<count>.json.
+Take a heap dump every 10 seconds and save it to ./heap_dumps/examples/heap_dump_count.json.
