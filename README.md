@@ -49,8 +49,8 @@ file.
 
 - **`collect_heap_metadata(file_name: str) -> str`**:
   This method collects metadata for all objects currently in memory, including additional code objects. It then saves
-  the heap dump to the specified `file_name`. It returns a message indicating the success or failure of the dump
-  process.
+  the heap dump to the specified `file_name`. It returns a string message indicating the success or Exception with fail
+  message and traceback.
 
 - **Private methods**:
     - `__safe_getattr`: Safely retrieve an attribute from an object.

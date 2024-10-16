@@ -166,43 +166,32 @@ class HeapDumper:
         Returns:
             Dict: A dictionary containing source information.
         """
-        src_info = {}
-
         if cls.__safe_isinstance(obj, (types.FunctionType, types.MethodType)):
             code = cls.__safe_getattr(obj, '__code__')
-            if code:
-                src_info = {
-                    'co_name': code.co_name,
-                    'co_filename': code.co_filename,
-                    'co_lineno': code.co_firstlineno
-                }
+            src_info = {key: value for key, value in {
+                'co_name': code.co_name if code else None,
+                'co_filename': code.co_filename if code else None,
+                'co_lineno': code.co_firstlineno if code else None
+            }.items() if value is not None}
+
         elif cls.__safe_isinstance(obj, (type, types.ModuleType)):
-            src_info = {
+            src_info = {key: value for key, value in {
                 'co_name': cls.__safe_getattr(obj, '__name__'),
                 'co_filename': cls.__safe_getattr(obj, '__file__'),
-            }
+            }.items() if value is not None}
+
         elif hasattr(obj, '__class__'):
             cls_obj = obj.__class__
             code = cls.__safe_getattr(cls.__safe_getattr(cls_obj, '__init__'), '__code__')
-            if code:
-                src_info = {
-                    'co_name': code.co_name,
-                    'co_filename': code.co_filename,
-                    'co_lineno': code.co_firstlineno
-                }
-            else:
-                module_name = cls.__safe_getattr(cls_obj, '__module__')
-                module = sys.modules.get(module_name)
-                src_info = {
-                    'co_name': cls_obj.__name__,
-                    'co_filename': cls.__safe_getattr(module, '__file__'),
-                }
+            src_info = {key: value for key, value in {
+                'co_name': code.co_name if code else cls_obj.__name__,
+                'co_filename': code.co_filename if code else cls.__safe_getattr(
+                    sys.modules.get(cls.__safe_getattr(cls_obj, '__module__')), '__file__'),
+                'co_lineno': code.co_firstlineno if code else None
+            }.items() if value is not None}
 
-        if 'co_filename' in src_info and src_info['co_filename'] is None:
-            del src_info['co_filename']
-
-        if 'co_name' in src_info and src_info['co_name'] is None:
-            del src_info['co_name']
+        else:
+            src_info = {}
 
         return src_info
 

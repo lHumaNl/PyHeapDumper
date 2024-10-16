@@ -5,10 +5,9 @@ from heap_dumper import HeapDumper
 
 
 def main():
-    # Configure logging
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-    file_dir = os.path.join('heap_dumps', 'examples')
-    some_production_activiti(file_dir)
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')  # Configure logging
+    file_dir = os.path.join('heap_dumps', 'examples')  # Forming heap dump files dir
+    some_production_activity(file_dir)
 
 
 def do_some_work():
@@ -18,7 +17,7 @@ def do_some_work():
         result += i ** 0.5  # Simple operation for workload
 
 
-def some_production_activiti(file_dir: str):
+def some_production_activity(file_dir: str):
     """
     Creates heap dumps at a specified interval for a given duration.
 
@@ -28,16 +27,18 @@ def some_production_activiti(file_dir: str):
     counter = 0
     while True:
         do_some_work()  # Perform background work
-        file_name = os.path.join(file_dir, f'heap_dump_{counter}')
+        file_name = os.path.join(file_dir, f'heap_dump_{counter}')  # Forming file name
 
         try:
-            logging.info(HeapDumper.collect_heap_metadata(file_name))
+            logging.info(
+                HeapDumper.collect_heap_metadata(file_name)  # Take heap dump and send success message to logger
+            )
         except Exception as e:
-            logging.error(e)
+            logging.error(e)  # Send exception message with traceback to logger
 
         counter += 1
         time.sleep(10)  # Wait before the next heap dump
 
 
 if __name__ == "__main__":
-    main()
+    main()  # Run application
