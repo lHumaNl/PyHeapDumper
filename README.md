@@ -36,7 +36,8 @@ For profiling captured heap dumps use this util: https://github.com/lHumaNl/PyHe
     from heap_dumper import HeapDumper
     ```
 
-   Then, call `HeapDumper.collect_heap_metadata` wherever you need to capture the heap dump.
+   Then, call `HeapDumper.collect_heap_metadata("heap_dumps/heap_dump_of_my_project.json")` wherever you need to capture
+   the heap dump.
 
 ## Usage
 
