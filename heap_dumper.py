@@ -8,7 +8,7 @@ import traceback
 import types
 from decimal import Decimal
 from fractions import Fraction
-from typing import Optional, Any, Dict, Set
+from typing import Optional, Any, Dict, Set, List
 
 
 class HeapDumper:
@@ -57,76 +57,64 @@ class HeapDumper:
     def __safe_getattr(obj, attr) -> Optional[Any]:
         """
         Safely retrieves an attribute from an object, returning None if an error occurs.
-
-        Args:
-            obj: The object from which to retrieve the attribute.
-            attr (str): The name of the attribute to retrieve.
-
-        Returns:
-            Optional[Any]: The attribute value or None if an error occurs.
         """
         try:
             return getattr(obj, attr)
-        except Exception:
+        except BaseException:
             return None
 
     @staticmethod
     def __safe_isinstance(obj, types_) -> bool:
         """
-        Safely checks if an object is an instance of a specified type,
-        handling exceptions gracefully.
-
-        Args:
-            obj: The object to check.
-            types_ (Union[type, Tuple[type, ...]]): The type or tuple of types to check against.
-
-        Returns:
-            bool: True if the object is an instance of the specified type(s), False otherwise.
+        Safely checks if an object is an instance of a specified type.
         """
         try:
             return isinstance(obj, types_)
-        except Exception:
+        except BaseException:
             return False
+
+    @staticmethod
+    def __safe_dir(obj) -> List[str]:
+        """
+        Safely retrieves the list of attributes from an object.
+        """
+        try:
+            return dir(obj)
+        except BaseException:
+            return []
 
     @classmethod
     def __get_code_objects(cls) -> Set:
         """
         Collects all code objects (functions, methods) currently loaded in memory.
-
-        Returns:
-            Set: A set of code objects found in the current Python environment.
         """
         code_objects = set()
         for module in list(sys.modules.values()):
             if module is None:
                 continue
 
+            # Collect code objects from module-level functions
             code_objects.update(
                 cls.__safe_getattr(func, '__code__')
-                for func_name in dir(module)
-
+                for func_name in cls.__safe_dir(module)
                 for func in [cls.__safe_getattr(module, func_name)]
-
                 if cls.__safe_isinstance(func, types.FunctionType)
                 and cls.__safe_getattr(func, '__code__') is not None
             )
 
+            # Collect code objects from class methods
             code_objects.update(
                 cls.__safe_getattr(method, '__code__')
-                for cls_name in dir(module)
+                for cls_name in cls.__safe_dir(module)
                 for cls_attr in [cls.__safe_getattr(module, cls_name)]
-
                 if cls.__safe_isinstance(cls_attr, type)
-
-                for attr_name in dir(cls_attr)
+                for attr_name in cls.__safe_dir(cls_attr)
                 for method in [cls.__safe_getattr(cls_attr, attr_name)]
-
                 if cls.__safe_isinstance(method, (types.FunctionType, types.MethodType))
                 and cls.__safe_getattr(method, '__code__') is not None
             )
 
         code_objects.discard(None)
-
         return code_objects
 
     @staticmethod
@@ -155,100 +143,139 @@ class HeapDumper:
         return file_name
 
     @classmethod
+    def __safe_hasattr(cls, obj, attr: str) -> bool:
+        """
+        Safely checks if an object has an attribute without triggering side effects.
+        """
+        try:
+            cls.__safe_getattr(obj, attr)
+            return True
+        except BaseException:
+            return False
+
+    @classmethod
     def __get_src_info(cls, obj) -> Dict:
         """
-        Retrieves source information (filename, line number, function name) of the object,
-        if applicable.
-
-        Args:
-            obj: The object to retrieve source information from.
-
-        Returns:
-            Dict: A dictionary containing source information.
+        Retrieves source information (filename, line number, function name) of the object.
         """
-        if cls.__safe_isinstance(obj, (types.FunctionType, types.MethodType)):
-            code = cls.__safe_getattr(obj, '__code__')
-            src_info = {key: value for key, value in {
-                'co_name': code.co_name if code else None,
-                'co_filename': code.co_filename if code else None,
-                'co_lineno': code.co_firstlineno if code else None
-            }.items() if value is not None}
+        try:
+            if cls.__safe_isinstance(obj, (types.FunctionType, types.MethodType)):
+                code = cls.__safe_getattr(obj, '__code__')
+                src_info = {key: value for key, value in {
+                    'co_name': cls.__safe_getattr(code, 'co_name'),
+                    'co_filename': cls.__safe_getattr(code, 'co_filename'),
+                    'co_lineno': cls.__safe_getattr(code, 'co_firstlineno')
+                }.items() if value is not None}
 
-        elif cls.__safe_isinstance(obj, (type, types.ModuleType)):
-            src_info = {key: value for key, value in {
-                'co_name': cls.__safe_getattr(obj, '__name__'),
-                'co_filename': cls.__safe_getattr(obj, '__file__'),
-            }.items() if value is not None}
+            elif cls.__safe_isinstance(obj, (type, types.ModuleType)):
+                src_info = {key: value for key, value in {
+                    'co_name': cls.__safe_getattr(obj, '__name__'),
+                    'co_filename': cls.__safe_getattr(obj, '__file__'),
+                }.items() if value is not None}
 
-        elif hasattr(obj, '__class__'):
-            cls_obj = obj.__class__
-            code = cls.__safe_getattr(cls.__safe_getattr(cls_obj, '__init__'), '__code__')
-            src_info = {key: value for key, value in {
-                'co_name': code.co_name if code else cls_obj.__name__,
-                'co_filename': code.co_filename if code else cls.__safe_getattr(
-                    sys.modules.get(cls.__safe_getattr(cls_obj, '__module__')), '__file__'),
-                'co_lineno': code.co_firstlineno if code else None
-            }.items() if value is not None}
+            else:
+                cls_obj = cls.__safe_getattr(obj, '__class__')
+                if cls_obj is not None:
+                    init_method = cls.__safe_getattr(cls_obj, '__init__')
+                    code = cls.__safe_getattr(init_method, '__code__') if init_method else None
 
-        else:
-            src_info = {}
+                    cls_name = cls.__safe_getattr(cls_obj, '__name__')
+                    cls_module = cls.__safe_getattr(cls_obj, '__module__')
+                    module_obj = sys.modules.get(cls_module) if cls_module else None
+                    module_file = cls.__safe_getattr(module_obj, '__file__') if module_obj else None
 
-        return src_info
+                    src_info = {key: value for key, value in {
+                        'co_name': cls.__safe_getattr(code, 'co_name') if code else cls_name,
+                        'co_filename': cls.__safe_getattr(code, 'co_filename') if code else module_file,
+                        'co_lineno': cls.__safe_getattr(code, 'co_firstlineno') if code else None
+                    }.items() if value is not None}
+                else:
+                    src_info = {}
+
+            return src_info
+        except BaseException:
+            return {}
+
+    @classmethod
+    def __convert_value(cls, value) -> Any:
+        """
+        Converts a value to a JSON-serializable format.
+        """
+        if value is None:
+            return None
+        if cls.__safe_isinstance(value, (bool, int)):
+            return value
+
+        if cls.__safe_isinstance(value, float):
+            try:
+                return value if math.isfinite(value) else str(value)
+            except BaseException:
+                return str(value)
+
+        if cls.__safe_isinstance(value, str):
+            try:
+                return value[:1000]
+            except BaseException:
+                return "[STRING_ACCESS_ERROR]"
+
+        if cls.__safe_isinstance(value, (bytes, memoryview)):
+            try:
+                return str(value[:1000])
+            except BaseException:
+                return "[BYTES_ACCESS_ERROR]"
+
+        if cls.__safe_isinstance(value, (Decimal, Fraction, complex)):
+            try:
+                return str(value)
+            except BaseException:
+                return "[NUMBER_CONVERT_ERROR]"
+
+        if cls.__safe_isinstance(value, range):
+            try:
+                return str(list(value)[:1000])
+            except BaseException:
+                return "[RANGE_CONVERT_ERROR]"
+
+        try:
+            return [str(type(value)), id(value)]
+        except BaseException:
+            return ["[UNKNOWN_TYPE]", 0]
 
     @classmethod
     def __get_object_metadata(cls, obj) -> Dict:
         """
         Collects metadata for a specific object, including its size, attributes,
         references, and source code information.
-
-        Args:
-            obj: The object to collect metadata from.
-
-        Returns:
-            Dict: A dictionary containing metadata about the object.
         """
-        obj_metadata = {'size': sys.getsizeof(obj)}
+        try:
+            obj_metadata: Any = {'size': sys.getsizeof(obj)}
+        except BaseException:
+            obj_metadata = {'size': 0}
 
-        if hasattr(obj, '__dict__') and obj.__dict__:
-            obj_metadata['attr'] = {
-                attr_name: (
-                    attr_value if isinstance(attr_value, (int, bool))
-                    else (
-                        attr_value if math.isfinite(attr_value) else str(attr_value)
-                    ) if isinstance(attr_value, float)
-                    else attr_value[:1000] if isinstance(attr_value, str)
-                    else str(attr_value[:1000]) if isinstance(attr_value, (memoryview, bytes))
-                    else str(attr_value) if isinstance(attr_value, (Decimal, Fraction, complex))
-                    else str(list(attr_value)[:1000]) if isinstance(attr_value, range)
-                    else None if attr_value is None
-                    else [str(type(attr_value)), id(attr_value)]
-                )
-                for attr_name, attr_value in obj.__dict__.items()
+        # Collect attributes using safe dir() + getattr()
+        try:
+            attrs = {
+                attr_name: cls.__convert_value(attr_value)
+                for attr_name in cls.__safe_dir(obj)
+                if not (attr_name.startswith('__') and attr_name.endswith('__'))
+                for attr_value in [cls.__safe_getattr(obj, attr_name)]
+                if attr_value is not None
             }
-        elif isinstance(obj, types.CodeType):
-            obj_metadata['attr'] = {
-                'co_name': obj.co_name,
-                'co_filename': obj.co_filename,
-                'co_firstlineno': obj.co_firstlineno
-            }
+            if attrs:
+                obj_metadata['attr'] = attrs
+        except BaseException:
+            pass
 
-        references = gc.get_referents(obj)
-        if references:
-            obj_metadata['ref'] = [
-                ref if cls.__safe_isinstance(ref, (int, bool))
-                else (
-                    ref if math.isfinite(ref) else str(ref)
-                ) if cls.__safe_isinstance(ref, float)
-                else ref[:1000] if cls.__safe_isinstance(ref, str)
-                else str(ref[:1000]) if cls.__safe_isinstance(ref, (memoryview, bytes))
-                else str(ref) if cls.__safe_isinstance(ref, (Decimal, Fraction, complex))
-                else str(list(ref)[:1000]) if cls.__safe_isinstance(ref, range)
-                else None if ref is None
-                else [str(type(ref)), id(ref)]
-                for ref in references
-            ]
+        # Collect references using gc.get_referents() for all types
+        try:
+            references = gc.get_referents(obj)
+            if references:
+                obj_metadata['ref'] = [cls.__convert_value(ref) for ref in references]
+        except BaseException:
+            pass
 
-        src_info = cls.__get_src_info(obj)
+        # Collect source info
+        src_info: Any = cls.__get_src_info(obj)
         if src_info:
             obj_metadata['src'] = src_info
 
